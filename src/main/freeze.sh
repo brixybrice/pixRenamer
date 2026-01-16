@@ -3,6 +3,9 @@ cd ~/PycharmProjects/pyside2/pixRenamer
 fbs clean
 fbs freeze
 #!/bin/bash
+
+rm -rf build dist
+
 set -e
 
 # Activer l'environnement virtuel
@@ -12,7 +15,6 @@ source venv3/bin/activate
 cd ~/PycharmProjects/pyside2/pixRenamer
 
 # Nettoyage des anciens builds PyInstaller
-rm -rf build dist
 rm -rf build dist __pycache__
 
 # Build de l'application avec PyInstaller (PySide6, sans fbs)

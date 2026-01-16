@@ -5,14 +5,13 @@ from PyInstaller.utils.hooks import collect_submodules
 from PyInstaller.building.build_main import Analysis, PYZ, EXE, COLLECT
 from PyInstaller.building.osx import BUNDLE
 
-# Collecte PySide6
 hiddenimports = collect_submodules("PySide6")
 
 a = Analysis(
     ["src/main/python/main.py"],
     pathex=["src/main/python"],
     binaries=[],
-    datas=[],
+    datas=[("src/resources", "resources")],
     hiddenimports=hiddenimports,
     excludes=["fbs", "fbs_runtime"],
     noarchive=False,
@@ -20,7 +19,6 @@ a = Analysis(
 
 pyz = PYZ(a.pure)
 
-# EXE : on NE CASSE PAS ce qui fonctionnait
 exe = EXE(
     pyz,
     a.scripts,
@@ -35,7 +33,6 @@ exe = EXE(
     target_arch="arm64",
 )
 
-# COLLECT : indispensable pour que l’app ne soit PAS vide
 coll = COLLECT(
     exe,
     a.binaries,
@@ -45,7 +42,6 @@ coll = COLLECT(
     name="Pix Renamer",
 )
 
-# BUNDLE macOS : icône + version
 app = BUNDLE(
     coll,
     name="Pix Renamer.app",
@@ -54,7 +50,7 @@ app = BUNDLE(
     info_plist={
         "CFBundleName": "Pix Renamer",
         "CFBundleDisplayName": "Pix Renamer",
-        "CFBundleShortVersionString": "1.2.0",
-        "CFBundleVersion": "1.2.0",
+        "CFBundleShortVersionString": "2.0.0",
+        "CFBundleVersion": "2.0.0",
     },
 )

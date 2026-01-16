@@ -1,15 +1,49 @@
 from PySide6 import QtCore, QtGui, QtWidgets
+from PySide6.QtGui import QIcon
 from package.api.readXML import rename_files_from_XML
 from package.api.readJSON import read_data_from_json, write_data_json
-
+from package.workers.rename_worker import RenameWorker
+from package.api.reverseJSON import reverse_from_json
+from package.utils.resources import resource_path
 
 class MainWindow(QtWidgets.QWidget):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Pix Renamer")
+        self.create_menu()
         self.setup_ui()
         self.sourceFolder =""
         self.sourceXML = ""
+
+    def create_menu(self):
+        menubar = QtWidgets.QMenuBar(self)
+        file_menu = menubar.addMenu("File")
+
+        self.action_reverse = QtGui.QAction("Reverse from JSON", self)
+        file_menu.addAction(self.action_reverse)
+
+        self.action_reverse.triggered.connect(self.reverse_from_json)
+
+        self.main_layout = QtWidgets.QVBoxLayout()
+        self.main_layout.setMenuBar(menubar)
+
+    def reverse_from_json(self):
+        file_dialog = QtWidgets.QFileDialog(self)
+        file_dialog.setNameFilters(["JSON (*.json)"])
+        if file_dialog.exec() != QtWidgets.QDialog.Accepted:
+            return
+
+        json_path = file_dialog.selectedUrls()[0].toLocalFile()
+
+        try:
+            count = reverse_from_json(json_path)
+            QtWidgets.QMessageBox.information(
+                self,
+                "Reverse completed",
+                f"{count} files have been restored"
+            )
+        except Exception as e:
+            QtWidgets.QMessageBox.critical(self, "Reverse error", str(e))
 
     def setup_ui(self):
         self.create_widgets()
@@ -25,10 +59,31 @@ class MainWindow(QtWidgets.QWidget):
         self.btn_circledTakes = QtWidgets.QCheckBox("circled takes only")
         self.btn_archive = QtWidgets.QCheckBox("keep original files (archive folder)")
         self.btn_filename = QtWidgets.QCheckBox("append source clipname in new filename")
-        self.btn_alexa35 = QtWidgets.QCheckBox("replace \"h\" with \"a\" (alexa35 with Daylight)")
-        self.btn_digit_shot = QtWidgets.QCheckBox("2 digits for shot values")
-        self.btn_digit_take = QtWidgets.QCheckBox("2 digits for take values")
+        # self.btn_alexa35 = QtWidgets.QCheckBox("replace \"h\" with \"a\" (alexa35 with Daylight)")
+        self.shot_digits_label = QtWidgets.QLabel("Shot digits")
+        self.spin_shot_digits = QtWidgets.QSpinBox()
+        self.spin_shot_digits.setRange(1, 9)
+        self.spin_shot_digits.setValue(2)
+        self.spin_shot_digits.setButtonSymbols(QtWidgets.QAbstractSpinBox.UpDownArrows)
+        self.spin_shot_digits.setFixedHeight(30)
+        font = self.spin_shot_digits.font()
+        font.setPointSize(font.pointSize() + 1)
+        self.spin_shot_digits.setFont(font)
+        self.take_digits_label = QtWidgets.QLabel("Take digits")
+        self.spin_take_digits = QtWidgets.QSpinBox()
+        self.spin_take_digits.setRange(1, 9)
+        self.spin_take_digits.setValue(2)
+        self.spin_take_digits.setButtonSymbols(QtWidgets.QAbstractSpinBox.UpDownArrows)
+        self.spin_take_digits.setFixedHeight(30)
+
+        font = self.spin_take_digits.font()
+        font.setPointSize(font.pointSize() + 1)
+        self.spin_take_digits.setFont(font)
         self.btn_episode = QtWidgets.QCheckBox("start the naming with episode")
+
+        self.progress = QtWidgets.QProgressBar()
+        self.progress.setRange(0, 0)  # indéterminée
+        self.progress.setVisible(False)
 
 
     def modify_widgets(self):
@@ -42,10 +97,17 @@ class MainWindow(QtWidgets.QWidget):
         self.btn_circledTakes.setChecked(read_data_from_json()['circledTakesValue'])
         self.btn_archive.setChecked(read_data_from_json()['archiveValue'])
         self.btn_filename.setChecked(read_data_from_json()['sourceFilenameValue'])
-        self.btn_alexa35.setChecked(read_data_from_json()['alexa35'])
-        self.btn_digit_shot.setChecked(read_data_from_json()['digits_shot'])
-        self.btn_digit_take.setChecked(read_data_from_json()['digits_take'])
+        # self.btn_alexa35.setChecked(read_data_from_json()['alexa35'])
+        self.spin_shot_digits.setValue(read_data_from_json()['digits_shot'])
+        self.spin_take_digits.setValue(read_data_from_json()['digits_take'])
         self.btn_episode.setChecked(read_data_from_json()['episode_val'])
+
+        up_icon = QIcon(resource_path("resources/icons/arrow_up.svg"))
+        down_icon = QIcon(resource_path("resources/icons/arrow_down.svg"))
+
+
+        self.spin_shot_digits.setButtonSymbols(QtWidgets.QAbstractSpinBox.UpDownArrows)
+        self.spin_take_digits.setButtonSymbols(QtWidgets.QAbstractSpinBox.UpDownArrows)
 
     def create_layouts(self):
         self.main_layout = QtWidgets.QVBoxLayout()
@@ -61,11 +123,28 @@ class MainWindow(QtWidgets.QWidget):
         self.main_layout.addWidget(self.btn_circledTakes)
         self.main_layout.addWidget(self.btn_archive)
         self.main_layout.addWidget(self.btn_filename)
-        self.main_layout.addWidget(self.btn_alexa35)
-        self.main_layout.addWidget(self.btn_digit_shot)
-        self.main_layout.addWidget(self.btn_digit_take)
+        # self.main_layout.addWidget(self.btn_alexa35)
+        digits_container = QtWidgets.QWidget()
+        digits_layout = QtWidgets.QHBoxLayout(digits_container)
+        digits_layout.setContentsMargins(0, 8, 0, 8)
+        digits_layout.setSpacing(12)
+
+        digits_layout.addWidget(self.shot_digits_label)
+        digits_layout.addWidget(self.spin_shot_digits)
+        digits_layout.addSpacing(24)
+        digits_layout.addWidget(self.take_digits_label)
+        digits_layout.addWidget(self.spin_take_digits)
         self.main_layout.addWidget(self.btn_episode)
+        digits_layout.addStretch()
+
+        self.spin_shot_digits.setFixedWidth(70)
+        self.spin_take_digits.setFixedWidth(70)
+
+        self.main_layout.addWidget(digits_container)
+
         self.main_layout.addWidget(self.btn_rename)
+
+        self.main_layout.addWidget(self.progress)
 
 
     def setup_connections(self):
@@ -74,25 +153,37 @@ class MainWindow(QtWidgets.QWidget):
         self.btn_rename.clicked.connect(self.rename_files)
 
     def rename_files(self):
-        """Launch the renaming process based on the provided paths"""
-        #sourceXML = '/Users/bricebarbier/Desktop/py/renameXML_source/A921_sony/A921_sony.xml'
-        #sourceFolder = '/Users/bricebarbier/Desktop/py/renameXML_source/A921_sony'
+        self.btn_rename.setEnabled(False)
+        self.progress.setVisible(True)
+        self.progress.setRange(0, 0)  # spinner
 
-        write_data_json(self.btn_archive.isChecked(),
-                              self.btn_filename.isChecked(),
-                              self.btn_circledTakes.isChecked(),
-                              self.btn_alexa35.isChecked(),
-                              self.btn_digit_shot.isChecked(),
-                              self.btn_digit_take.isChecked(),
-                              self.btn_episode.isChecked())
+        self.thread = QtCore.QThread()
+        self.worker = RenameWorker(
+            self.sourceXML,
+            self.sourceFolder,
+            self.btn_archive.isChecked(),
+            self.btn_filename.isChecked(),
+            self.btn_circledTakes.isChecked(),
+            # self.btn_alexa35.isChecked(),
+            False,
+            self.spin_shot_digits.value(),
+            self.spin_take_digits.value(),
+            self.btn_episode.isChecked()
+        )
 
-        count = rename_files_from_XML(self.sourceXML, self.sourceFolder, self.btn_archive.isChecked(), self.btn_filename.isChecked(), self.btn_circledTakes.isChecked(),  self.btn_alexa35.isChecked(), self.btn_digit_shot.isChecked(), self.btn_digit_take.isChecked(),  self.btn_episode.isChecked())
-        message_box = QtWidgets.QMessageBox()
-        if count == 0:
-            message_box.setText(f'There is no file to be renamed')
-        else:
-            message_box.setText(f'{count} files have been successfully renamed')
-        message_box.exec()
+        self.worker.moveToThread(self.thread)
+
+        self.thread.started.connect(self.worker.run)
+        self.worker.finished.connect(self.on_rename_finished)
+        self.worker.error.connect(self.on_rename_error)
+
+        self.worker.finished.connect(self.thread.quit)
+        self.worker.finished.connect(self.worker.deleteLater)
+        self.thread.finished.connect(self.thread.deleteLater)
+        self.worker.error.connect(self.thread.quit)
+        self.worker.error.connect(self.worker.deleteLater)
+
+        self.thread.start()
 
     def choose_source_folder(self):
         file_dialog = QtWidgets.QFileDialog(self)
@@ -113,5 +204,45 @@ class MainWindow(QtWidgets.QWidget):
             if self.sourceFolder != '':
                 self.btn_rename.setEnabled(True)
 
+    def on_rename_finished(self, count):
+        self.btn_rename.setEnabled(True)
+        self.progress.setVisible(False)
 
+        msg = QtWidgets.QMessageBox(self)
+        msg.setWindowTitle("Rename completed")
 
+        if count == 0:
+            msg.setText("There is no file to be renamed")
+            msg.addButton(QtWidgets.QMessageBox.Ok)
+        else:
+            msg.setText(f"{count} files have been successfully renamed")
+            open_btn = msg.addButton("Open Folder", QtWidgets.QMessageBox.ActionRole)
+            msg.addButton(QtWidgets.QMessageBox.Ok)
+
+        msg.exec()
+
+        if count > 0 and msg.clickedButton() == open_btn:
+            QtGui.QDesktopServices.openUrl(
+                QtCore.QUrl.fromLocalFile(self.sourceFolder)
+            )
+
+    def on_rename_error(self, message):
+        # Stop any progress indication (duplicates = no operation performed)
+        self.progress.setVisible(False)
+        self.progress.setRange(0, 0)
+        self.btn_rename.setEnabled(True)
+
+        msg = QtWidgets.QMessageBox(self)
+        msg.setIcon(QtWidgets.QMessageBox.Warning)
+        msg.setWindowTitle("Rename aborted")
+
+        msg.setText(
+            "Some files would generate identical output filenames.\n"
+            "No file has been modified."
+        )
+
+        # Show ALL duplicates in the expandable details section
+        msg.setDetailedText(message)
+
+        msg.setStandardButtons(QtWidgets.QMessageBox.Ok)
+        msg.exec()

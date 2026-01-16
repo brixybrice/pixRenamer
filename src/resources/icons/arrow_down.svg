@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="12"
+    height="12"
+    viewBox="0 0 24 24"
+    fill="#d3d3d3">
+
+    <!-- Down arrow: path is explicitly inverted, no transform -->
+    <path d="M21 5H3a1.002 1.002 0 0 0-.823 1.569l9 13c.373.539 1.271.539 1.645 0l9-13A.999.999 0 0 0 21 5z"/>
+</svg>
