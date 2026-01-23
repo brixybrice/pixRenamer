@@ -33,3 +33,20 @@ open dist
 
 echo "Build terminé avec succès."
 echo "Application disponible dans : $APP_PATH"
+
+APP_NAME="Pix Renamer"
+APP_PATH="dist/${APP_NAME}.app"
+DMG_NAME="Pix_Renamer.dmg"
+DMG_TMP="dist/tmp.dmg"
+
+rm -f "dist/${DMG_NAME}"
+
+create-dmg \
+  --volname "${APP_NAME}" \
+  --window-pos 200 120 \
+  --window-size 600 400 \
+  --icon-size 120 \
+  --icon "${APP_NAME}.app" 150 200 \
+  --app-drop-link 450 200 \
+  "${DMG_NAME}" \
+  "dist"

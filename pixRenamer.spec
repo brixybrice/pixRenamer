@@ -50,7 +50,7 @@ app = BUNDLE(
     info_plist={
         "CFBundleName": "Pix Renamer",
         "CFBundleDisplayName": "Pix Renamer",
-        "CFBundleShortVersionString": "2.0.0",
-        "CFBundleVersion": "2.0.0",
+        "CFBundleShortVersionString": "2.0.1",
+        "CFBundleVersion": "2.0.1",
     },
 )

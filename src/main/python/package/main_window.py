@@ -5,6 +5,8 @@ from package.api.readJSON import read_data_from_json, write_data_json
 from package.workers.rename_worker import RenameWorker
 from package.api.reverseJSON import reverse_from_json
 from package.utils.resources import resource_path
+from package.utils.settings import load_settings, save_settings
+
 
 class MainWindow(QtWidgets.QWidget):
     def __init__(self):
@@ -14,6 +16,32 @@ class MainWindow(QtWidgets.QWidget):
         self.setup_ui()
         self.sourceFolder =""
         self.sourceXML = ""
+
+        self.settings = load_settings()
+
+        # Ensure settings file exists on first launch
+        if not self.settings:
+            self.settings = {
+                "shot_digits": 2,
+                "take_digits": 2,
+                "archive": False,
+                "filename": False,
+                "circled": False,
+            }
+            save_settings(self.settings)
+
+        self.spin_shot_digits.setValue(self.settings.get("shot_digits", 2))
+        self.spin_take_digits.setValue(self.settings.get("take_digits", 2))
+        self.btn_archive.setChecked(self.settings.get("archive", False))
+        self.btn_filename.setChecked(self.settings.get("filename", False))
+        self.btn_circledTakes.setChecked(self.settings.get("circled", False))
+
+        self.sourceFolder = self.settings.get("last_folder", "")
+        self.sourceXML = self.settings.get("last_xml", "")
+
+        if self.sourceFolder and self.sourceXML:
+            self.btn_rename.setEnabled(True)
+
 
     def create_menu(self):
         menubar = QtWidgets.QMenuBar(self)
@@ -157,6 +185,16 @@ class MainWindow(QtWidgets.QWidget):
         self.progress.setVisible(True)
         self.progress.setRange(0, 0)  # spinner
 
+        save_settings({
+            "shot_digits": self.spin_shot_digits.value(),
+            "take_digits": self.spin_take_digits.value(),
+            "archive": self.btn_archive.isChecked(),
+            "filename": self.btn_filename.isChecked(),
+            "circled": self.btn_circledTakes.isChecked(),
+            "last_folder": self.sourceFolder,
+            "last_xml": self.sourceXML,
+        })
+
         self.thread = QtCore.QThread()
         self.worker = RenameWorker(
             self.sourceXML,
@@ -191,6 +229,10 @@ class MainWindow(QtWidgets.QWidget):
         if file_dialog.exec() == QtWidgets.QDialog.DialogCode.Accepted:
             self.sourceFolder = file_dialog.selectedUrls()[0].toLocalFile()
             print(self.sourceFolder)
+            save_settings({
+                **load_settings(),
+                "last_folder": self.sourceFolder
+            })
             if self.sourceXML != '':
                 self.btn_rename.setEnabled(True)
 
@@ -201,6 +243,10 @@ class MainWindow(QtWidgets.QWidget):
         if file_dialog.exec() == QtWidgets.QDialog.DialogCode.Accepted:
             self.sourceXML = file_dialog.selectedUrls()[0].toLocalFile()
             print(self.sourceXML)
+            save_settings({
+                **load_settings(),
+                "last_xml": self.sourceXML
+            })
             if self.sourceFolder != '':
                 self.btn_rename.setEnabled(True)
 
@@ -246,3 +292,15 @@ class MainWindow(QtWidgets.QWidget):
 
         msg.setStandardButtons(QtWidgets.QMessageBox.Ok)
         msg.exec()
+
+    def closeEvent(self, event):
+        save_settings({
+            "shot_digits": self.spin_shot_digits.value(),
+            "take_digits": self.spin_take_digits.value(),
+            "archive": self.btn_archive.isChecked(),
+            "filename": self.btn_filename.isChecked(),
+            "circled": self.btn_circledTakes.isChecked(),
+            "last_folder": self.sourceFolder,
+            "last_xml": self.sourceXML,
+        })
+        event.accept()
