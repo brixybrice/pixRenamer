@@ -1,59 +1,67 @@
 from PySide6 import QtCore, QtGui, QtWidgets
 from PySide6.QtGui import QIcon
 from package.api.readXML import rename_files_from_XML
-from package.api.readJSON import read_data_from_json, write_data_json
+# from package.api.readJSON import read_data_from_json, write_data_json  # legacy (disabled)
 from package.workers.rename_worker import RenameWorker
 from package.api.reverseJSON import reverse_from_json
 from package.utils.resources import resource_path
 from package.utils.settings import load_settings, save_settings
+import os
+import subprocess
 
 
 class MainWindow(QtWidgets.QWidget):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Pix Renamer")
-        self.create_menu()
-        self.setup_ui()
-        self.sourceFolder =""
-        self.sourceXML = ""
 
+        # Load persisted settings first (must not depend on UI being created)
+        self.sourceFolder = ""
+        self.sourceXML = ""
         self.settings = load_settings()
 
         # Ensure settings file exists on first launch
         if not self.settings:
             self.settings = {
-                "shot_digits": 2,
-                "take_digits": 2,
+                "shot_digits": 1,
+                "take_digits": 1,
                 "archive": False,
                 "filename": False,
                 "circled": False,
+                "episode": False,
+                "last_folder": "",
+                "last_xml": "",
             }
             save_settings(self.settings)
 
-        self.spin_shot_digits.setValue(self.settings.get("shot_digits", 2))
-        self.spin_take_digits.setValue(self.settings.get("take_digits", 2))
-        self.btn_archive.setChecked(self.settings.get("archive", False))
-        self.btn_filename.setChecked(self.settings.get("filename", False))
-        self.btn_circledTakes.setChecked(self.settings.get("circled", False))
+        # Build UI
+        self.create_menu()
+        self.setup_ui()
 
-        self.sourceFolder = self.settings.get("last_folder", "")
-        self.sourceXML = self.settings.get("last_xml", "")
+        # Apply settings safely (widgets exist now)
+        self.spin_shot_digits.setValue(int(self.settings.get("shot_digits", 2)))
+        self.spin_take_digits.setValue(int(self.settings.get("take_digits", 2)))
+        self.btn_archive.setChecked(bool(self.settings.get("archive", False)))
+        self.btn_filename.setChecked(bool(self.settings.get("filename", False)))
+        self.btn_circledTakes.setChecked(bool(self.settings.get("circled", False)))
+        self.btn_episode.setChecked(bool(self.settings.get("episode", False)))
 
-        if self.sourceFolder and self.sourceXML:
-            self.btn_rename.setEnabled(True)
+        self.sourceFolder = self.settings.get("last_folder", "") or ""
+        self.sourceXML = self.settings.get("last_xml", "") or ""
+
+        # Enable rename only when both paths are set
+        self.btn_rename.setEnabled(bool(self.sourceFolder and self.sourceXML))
 
 
     def create_menu(self):
-        menubar = QtWidgets.QMenuBar(self)
-        file_menu = menubar.addMenu("File")
+        self.menubar = QtWidgets.QMenuBar(self)
+        file_menu = self.menubar.addMenu("File")
 
         self.action_reverse = QtGui.QAction("Reverse from JSON", self)
         file_menu.addAction(self.action_reverse)
 
         self.action_reverse.triggered.connect(self.reverse_from_json)
 
-        self.main_layout = QtWidgets.QVBoxLayout()
-        self.main_layout.setMenuBar(menubar)
 
     def reverse_from_json(self):
         file_dialog = QtWidgets.QFileDialog(self)
@@ -122,23 +130,12 @@ class MainWindow(QtWidgets.QWidget):
         self.btn_archive.setCursor(QtGui.QCursor(QtCore.Qt.PointingHandCursor))
         self.btn_filename.setCursor(QtGui.QCursor(QtCore.Qt.PointingHandCursor))
 
-        self.btn_circledTakes.setChecked(read_data_from_json()['circledTakesValue'])
-        self.btn_archive.setChecked(read_data_from_json()['archiveValue'])
-        self.btn_filename.setChecked(read_data_from_json()['sourceFilenameValue'])
-        # self.btn_alexa35.setChecked(read_data_from_json()['alexa35'])
-        self.spin_shot_digits.setValue(read_data_from_json()['digits_shot'])
-        self.spin_take_digits.setValue(read_data_from_json()['digits_take'])
-        self.btn_episode.setChecked(read_data_from_json()['episode_val'])
-
-        up_icon = QIcon(resource_path("resources/icons/arrow_up.svg"))
-        down_icon = QIcon(resource_path("resources/icons/arrow_down.svg"))
-
-
         self.spin_shot_digits.setButtonSymbols(QtWidgets.QAbstractSpinBox.UpDownArrows)
         self.spin_take_digits.setButtonSymbols(QtWidgets.QAbstractSpinBox.UpDownArrows)
 
     def create_layouts(self):
         self.main_layout = QtWidgets.QVBoxLayout()
+        self.main_layout.setMenuBar(self.menubar)
         self.setLayout(self.main_layout)
         self.sources = QtWidgets.QWidget()
         self.sources_layout = QtWidgets.QHBoxLayout()
@@ -191,6 +188,7 @@ class MainWindow(QtWidgets.QWidget):
             "archive": self.btn_archive.isChecked(),
             "filename": self.btn_filename.isChecked(),
             "circled": self.btn_circledTakes.isChecked(),
+            "episode": self.btn_episode.isChecked(),
             "last_folder": self.sourceFolder,
             "last_xml": self.sourceXML,
         })
@@ -268,9 +266,11 @@ class MainWindow(QtWidgets.QWidget):
         msg.exec()
 
         if count > 0 and msg.clickedButton() == open_btn:
-            QtGui.QDesktopServices.openUrl(
-                QtCore.QUrl.fromLocalFile(self.sourceFolder)
-            )
+            latest = load_settings()
+            last_folder = self.sourceFolder or latest.get("last_folder", "")
+
+            if last_folder and os.path.exists(last_folder):
+                subprocess.run(["open", last_folder])
 
     def on_rename_error(self, message):
         # Stop any progress indication (duplicates = no operation performed)
@@ -300,6 +300,7 @@ class MainWindow(QtWidgets.QWidget):
             "archive": self.btn_archive.isChecked(),
             "filename": self.btn_filename.isChecked(),
             "circled": self.btn_circledTakes.isChecked(),
+            "episode": self.btn_episode.isChecked(),
             "last_folder": self.sourceFolder,
             "last_xml": self.sourceXML,
         })

@@ -35,11 +35,17 @@ echo "Build terminé avec succès."
 echo "Application disponible dans : $APP_PATH"
 
 APP_NAME="Pix Renamer"
-APP_PATH="dist/${APP_NAME}.app"
 DMG_NAME="Pix_Renamer.dmg"
-DMG_TMP="dist/tmp.dmg"
+TMP_DMG="dist/tmp.dmg"
 
-rm -f "dist/${DMG_NAME}"
+rm -f "dist/$DMG_NAME"
+rm -f "$TMP_DMG"
+
+hdiutil create -volname "$APP_NAME" -srcfolder "dist/$APP_NAME.app" -ov -format UDZO "$TMP_DMG"
+
+hdiutil convert "$TMP_DMG" -format UDZO -o "dist/$DMG_NAME"
+
+rm -f "$TMP_DMG"
 
 create-dmg \
   --volname "${APP_NAME}" \
